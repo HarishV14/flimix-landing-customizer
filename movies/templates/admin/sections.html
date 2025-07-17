@@ -1,0 +1,249 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Sections{% endblock %}
+
+{% block page_title %}Sections{% endblock %}
+
+{% block page_actions %}
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createSectionModal">
+    <i class="fas fa-plus"></i> New Section
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        {% if sections %}
+            <form id="reorderForm" method="post" action="{% url 'reorder-sections' %}">
+                {% csrf_token %}
+                <input type="hidden" name="section_order" id="sectionOrder">
+                <div class="mb-3">
+                    <button type="submit" class="btn btn-success" id="saveOrderBtn" style="display: none;">
+                        <i class="fas fa-save"></i> Save Order
+                    </button>
+                </div>
+                
+                <div id="sectionsList" class="list-group">
+                    {% for section in sections %}
+                        <div class="list-group-item sortable-item" data-id="{{ section.id }}">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-grip-lines me-2"></i>
+                                    <span class="fw-bold">{{ section.name }}</span>
+                                    <span class="badge bg-secondary ms-2">{{ section.get_section_type_display }}</span>
+                                    
+                                    {% if section.content_selection_type == 'automatic' %}
+                                        <span class="badge bg-info ms-2">Automatic</span>
+                                        {% if section.auto_genre %}
+                                            <span class="badge bg-light text-dark">{{ section.auto_genre.name }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-primary ms-2">Manual</span>
+                                    {% endif %}
+                                    
+                                    <span class="badge bg-dark ms-2">{{ section.content_count }} items</span>
+                                </div>
+                                <div>
+                                    <a href="{% url 'admin-section-content' section.id %}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-edit"></i> Manage Content
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#editSectionModal"
+                                            data-section-id="{{ section.id }}"
+                                            data-section-name="{{ section.name }}"
+                                            data-section-type="{{ section.content_selection_type }}"
+                                            data-section-genre="{{ section.auto_genre.id|default:'' }}">
+                                        <i class="fas fa-pen"></i> Edit
+                                    </button>
+                                    <form method="post" action="{% url 'delete-section' section.id %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this section?');">
+                                            <i class="fas fa-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </form>
+        {% else %}
+            <p>No sections created yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Section Modal -->
+<div class="modal fade" id="createSectionModal" tabindex="-1" aria-labelledby="createSectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'create-section' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createSectionModalLabel">Create New Section</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="section_type" class="form-label">Section Type</label>
+                        <select class="form-select" id="section_type" name="section_type" required>
+                            <option value="hero">Hero Section</option>
+                            <option value="carousel" selected>Carousel</option>
+                            <option value="grid">Grid</option>
+                            <option value="featured">Featured Content</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="content_selection_type" class="form-label">Content Selection</label>
+                        <select class="form-select" id="content_selection_type" name="content_selection_type" required>
+                            <option value="manual" selected>Manual Selection</option>
+                            <option value="automatic">Automatic (by Genre)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="auto_genre_container" style="display: none;">
+                        <label for="auto_genre_id" class="form-label">Genre for Automatic Selection</label>
+                        <select class="form-select" id="auto_genre_id" name="auto_genre_id">
+                            <option value="">Select a genre</option>
+                            {% for genre in genres %}
+                                <option value="{{ genre.id }}">{{ genre.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Section Modal -->
+<div class="modal fade" id="editSectionModal" tabindex="-1" aria-labelledby="editSectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="" id="editSectionForm">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editSectionModalLabel">Edit Section</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">Name</label>
+                        <input type="text" class="form-control" id="edit_name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_content_selection_type" class="form-label">Content Selection</label>
+                        <select class="form-select" id="edit_content_selection_type" name="content_selection_type" required>
+                            <option value="manual">Manual Selection</option>
+                            <option value="automatic">Automatic (by Genre)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="edit_auto_genre_container">
+                        <label for="edit_auto_genre_id" class="form-label">Genre for Automatic Selection</label>
+                        <select class="form-select" id="edit_auto_genre_id" name="auto_genre_id">
+                            <option value="">Select a genre</option>
+                            {% for genre in genres %}
+                                <option value="{{ genre.id }}">{{ genre.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sortable initialization
+        const sectionsList = document.getElementById('sectionsList');
+        const sectionOrder = document.getElementById('sectionOrder');
+        const saveOrderBtn = document.getElementById('saveOrderBtn');
+        
+        if (sectionsList) {
+            const sortable = new Sortable(sectionsList, {
+                animation: 150,
+                ghostClass: 'bg-light',
+                onEnd: function() {
+                    // Show save button when order changes
+                    saveOrderBtn.style.display = 'inline-block';
+                    
+                    // Update the hidden input with the new order
+                    const items = sectionsList.querySelectorAll('.sortable-item');
+                    const ids = Array.from(items).map(item => item.dataset.id);
+                    sectionOrder.value = ids.join(',');
+                }
+            });
+        }
+        
+        // Create section form - toggle auto genre field
+        const contentSelectionType = document.getElementById('content_selection_type');
+        const autoGenreContainer = document.getElementById('auto_genre_container');
+        
+        if (contentSelectionType && autoGenreContainer) {
+            contentSelectionType.addEventListener('change', function() {
+                if (this.value === 'automatic') {
+                    autoGenreContainer.style.display = 'block';
+                } else {
+                    autoGenreContainer.style.display = 'none';
+                }
+            });
+        }
+        
+        // Edit section modal
+        const editSectionModal = document.getElementById('editSectionModal');
+        if (editSectionModal) {
+            editSectionModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                const sectionId = button.getAttribute('data-section-id');
+                const sectionName = button.getAttribute('data-section-name');
+                const sectionType = button.getAttribute('data-section-type');
+                const sectionGenre = button.getAttribute('data-section-genre');
+                
+                const form = editSectionModal.querySelector('#editSectionForm');
+                const nameInput = editSectionModal.querySelector('#edit_name');
+                const typeSelect = editSectionModal.querySelector('#edit_content_selection_type');
+                const genreSelect = editSectionModal.querySelector('#edit_auto_genre_id');
+                const genreContainer = editSectionModal.querySelector('#edit_auto_genre_container');
+                
+                form.action = `/custom-admin/sections/update/${sectionId}/`;
+                nameInput.value = sectionName;
+                typeSelect.value = sectionType;
+                
+                if (sectionType === 'automatic') {
+                    genreContainer.style.display = 'block';
+                    if (sectionGenre) {
+                        genreSelect.value = sectionGenre;
+                    }
+                } else {
+                    genreContainer.style.display = 'none';
+                }
+                
+                // Add event listener for content selection type change
+                typeSelect.addEventListener('change', function() {
+                    if (this.value === 'automatic') {
+                        genreContainer.style.display = 'block';
+                    } else {
+                        genreContainer.style.display = 'none';
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}
+
+{% endblock %} 

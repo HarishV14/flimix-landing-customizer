@@ -9,59 +9,63 @@
     <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-photo-film me-2"></i> Hero Section</h5>
-                {% if hero_settings and hero_settings.featured_movie %}
-                    <div class="preview-container">
-                        <div class="preview-hero" style="background-image: url('{{ hero_settings.featured_movie.background_image_url }}');">
-                            <div class="preview-hero-content">
-                                <h3>{{ hero_settings.featured_movie.title }}</h3>
-                                <p>{{ hero_settings.featured_movie.description|truncatechars:100 }}</p>
-                            </div>
-                        </div>
+                <h5 class="card-title"><i class="fas fa-sitemap me-2"></i> Landing Pages</h5>
+                <div class="d-flex align-items-center mb-3">
+                    <div>
+                        <h6>Active Landing Page:</h6>
+                        <p class="mb-0">{{ landing_page.name }}</p>
                     </div>
-                {% else %}
-                    <p>No hero movie selected</p>
-                {% endif %}
-                <a href="{% url 'admin-hero' %}" class="btn btn-primary">Configure Hero</a>
+                    <a href="{% url 'admin-landing-pages' %}" class="btn btn-primary ms-auto">Manage</a>
+                </div>
+                <div class="small text-muted">
+                    <p>{{ landing_pages.count }} total landing page(s)</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-md-6 col-lg-8 mb-4">
+    <div class="col-md-6 col-lg-4 mb-4">
         <div class="card h-100">
             <div class="card-body">
-                <h5 class="card-title"><i class="fas fa-layer-group me-2"></i> Categories</h5>
-                {% if categories %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Position</th>
-                                    <th>Name</th>
-                                    <th>Movies</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for category in categories %}
-                                <tr>
-                                    <td>{{ category.position }}</td>
-                                    <td>{{ category.name }}</td>
-                                    <td>{{ category.movie_count }}</td>
-                                    <td>
-                                        <a href="{% url 'admin-category-movies' category.id %}" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-film"></i> Manage Movies
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                <h5 class="card-title"><i class="fas fa-layer-group me-2"></i> Sections</h5>
+                <div class="d-flex align-items-center mb-3">
+                    <div>
+                        <h6>Total Sections:</h6>
+                        <p class="mb-0">{{ sections.count }}</p>
                     </div>
-                {% else %}
-                    <p>No categories created yet</p>
-                {% endif %}
-                <a href="{% url 'admin-categories' %}" class="btn btn-primary">Manage Categories</a>
+                    <a href="{% url 'admin-sections' %}" class="btn btn-primary ms-auto">Manage</a>
+                </div>
+                <div class="small text-muted">
+                    <p>Sections are used to organize content on landing pages.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-film me-2"></i> Content</h5>
+                <div class="row">
+                    <div class="col-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div>
+                                <h6>Movies:</h6>
+                                <p class="mb-0">{{ movie_count }}</p>
+                            </div>
+                            <a href="{% url 'admin-movies' %}" class="btn btn-sm btn-primary ms-auto">View</a>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div>
+                                <h6>Series:</h6>
+                                <p class="mb-0">{{ series_count }}</p>
+                            </div>
+                            <a href="{% url 'admin-series' %}" class="btn btn-sm btn-primary ms-auto">View</a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -71,33 +75,59 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body">
-                <h5 class="card-title">Landing Page Preview</h5>
-                <div class="preview-container mb-4">
-                    {% if hero_settings and hero_settings.featured_movie %}
-                        <div class="preview-hero" style="background-image: url('{{ hero_settings.featured_movie.background_image_url }}');">
-                            <div class="preview-hero-content">
-                                <h3>{{ hero_settings.featured_movie.title }}</h3>
-                                <p>{{ hero_settings.featured_movie.description|truncatechars:100 }}</p>
-                                <button class="btn btn-sm btn-light">Watch Now</button>
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
-
-                {% for category in categories %}
-                    {% if category.movies.all %}
-                        <div class="preview-carousel">
-                            <h5 class="preview-carousel-title">{{ category.name }}</h5>
-                            <div class="preview-movie-cards">
-                                {% for movie in category.movies.all %}
-                                    <div class="preview-movie-card">
-                                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="img-fluid">
-                                    </div>
+                <h5 class="card-title">Landing Page Structure</h5>
+                <p class="text-muted">Active landing page: {{ landing_page.name }}</p>
+                
+                {% if landing_page.landingpagesection_set.all %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Section</th>
+                                    <th>Type</th>
+                                    <th>Selection</th>
+                                    <th>Content Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for lp_section in landing_page.landingpagesection_set.all|dictsort:"position" %}
+                                <tr>
+                                    <td>{{ lp_section.position }}</td>
+                                    <td>{{ lp_section.section.name }}</td>
+                                    <td><span class="badge bg-secondary">{{ lp_section.section.get_section_type_display }}</span></td>
+                                    <td>
+                                        {% if lp_section.section.content_selection_type == 'automatic' %}
+                                            <span class="badge bg-info">Automatic</span>
+                                            {% if lp_section.section.auto_genre %}
+                                                <span class="badge bg-light text-dark">{{ lp_section.section.auto_genre.name }}</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-primary">Manual</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if lp_section.section.content_selection_type == 'manual' %}
+                                            {{ lp_section.section.sectionitem_set.count }}
+                                        {% else %}
+                                            Auto
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'admin-section-content' lp_section.section.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i> Manage Content
+                                        </a>
+                                    </td>
+                                </tr>
                                 {% endfor %}
-                            </div>
-                        </div>
-                    {% endif %}
-                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p>No sections added to this landing page yet.</p>
+                    <a href="{% url 'admin-landing-page-sections' landing_page.id %}" class="btn btn-primary">Add Sections</a>
+                {% endif %}
             </div>
         </div>
     </div>

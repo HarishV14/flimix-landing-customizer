@@ -113,21 +113,33 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="{% if request.resolver_match.url_name == 'admin-landing-pages' %}active{% endif %}" 
+                               href="{% url 'admin-landing-pages' %}">
+                               <i class="fas fa-sitemap me-2"></i> Landing Pages
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="{% if request.resolver_match.url_name == 'admin-sections' %}active{% endif %}" 
+                               href="{% url 'admin-sections' %}">
+                               <i class="fas fa-layer-group me-2"></i> Sections
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="{% if request.resolver_match.url_name == 'admin-movies' %}active{% endif %}" 
                                href="{% url 'admin-movies' %}">
                                <i class="fas fa-film me-2"></i> Movies
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="{% if request.resolver_match.url_name == 'admin-hero' %}active{% endif %}" 
-                               href="{% url 'admin-hero' %}">
-                               <i class="fas fa-photo-film me-2"></i> Hero Section
+                            <a class="{% if request.resolver_match.url_name == 'admin-series' %}active{% endif %}" 
+                               href="{% url 'admin-series' %}">
+                               <i class="fas fa-tv me-2"></i> Series
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="{% if request.resolver_match.url_name == 'admin-categories' %}active{% endif %}" 
-                               href="{% url 'admin-categories' %}">
-                               <i class="fas fa-layer-group me-2"></i> Categories
+                            <a class="{% if request.resolver_match.url_name == 'admin-genres' %}active{% endif %}" 
+                               href="{% url 'admin-genres' %}">
+                               <i class="fas fa-tags me-2"></i> Genres
                             </a>
                         </li>
                     </ul>

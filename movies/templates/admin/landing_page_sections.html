@@ -1,0 +1,163 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Landing Page Sections{% endblock %}
+
+{% block page_title %}Sections for "{{ landing_page.name }}"{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'admin-landing-pages' %}" class="btn btn-outline-secondary me-2">
+    <i class="fas fa-arrow-left"></i> Back to Landing Pages
+</a>
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSectionModal">
+    <i class="fas fa-plus"></i> Add Section
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Landing Page Information</h5>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Name:</strong> {{ landing_page.name }}</p>
+                <p><strong>Status:</strong> 
+                    {% if landing_page.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Inactive</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Created:</strong> {{ landing_page.created_at|date:"M d, Y H:i" }}</p>
+                <p><strong>Last Updated:</strong> {{ landing_page.updated_at|date:"M d, Y H:i" }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Sections</h5>
+        
+        {% if landing_page_sections %}
+            <form id="reorderForm" method="post" action="{% url 'reorder-landing-page-sections' landing_page.id %}">
+                {% csrf_token %}
+                <input type="hidden" name="section_order" id="sectionOrder">
+                <div class="mb-3">
+                    <button type="submit" class="btn btn-success" id="saveOrderBtn" style="display: none;">
+                        <i class="fas fa-save"></i> Save Order
+                    </button>
+                </div>
+                
+                <div id="sectionsList" class="list-group">
+                    {% for lp_section in landing_page_sections %}
+                        <div class="list-group-item sortable-item d-flex justify-content-between align-items-center" data-id="{{ lp_section.id }}">
+                            <div>
+                                <i class="fas fa-grip-lines me-2"></i>
+                                <span class="fw-bold">{{ lp_section.section.name }}</span>
+                                <span class="badge bg-secondary ms-2">{{ lp_section.section.get_section_type_display }}</span>
+                                
+                                {% if lp_section.section.content_selection_type == 'automatic' %}
+                                    <span class="badge bg-info ms-2">Automatic</span>
+                                    {% if lp_section.section.auto_genre %}
+                                        <span class="badge bg-light text-dark">{{ lp_section.section.auto_genre.name }}</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-primary ms-2">Manual</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="{% url 'admin-section-content' lp_section.section.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> Manage Content
+                                </a>
+                                <form method="post" action="{% url 'remove-section-from-landing-page' landing_page.id lp_section.section.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to remove this section?');">
+                                        <i class="fas fa-times"></i> Remove
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </form>
+        {% else %}
+            <p>No sections added to this landing page yet.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Section Modal -->
+<div class="modal fade" id="addSectionModal" tabindex="-1" aria-labelledby="addSectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addSectionModalLabel">Add Section to Landing Page</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if available_sections %}
+                    <div class="list-group">
+                        {% for section in available_sections %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="fw-bold">{{ section.name }}</span>
+                                    <span class="badge bg-secondary ms-2">{{ section.get_section_type_display }}</span>
+                                    
+                                    {% if section.content_selection_type == 'automatic' %}
+                                        <span class="badge bg-info ms-2">Automatic</span>
+                                        {% if section.auto_genre %}
+                                            <span class="badge bg-light text-dark">{{ section.auto_genre.name }}</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-primary ms-2">Manual</span>
+                                    {% endif %}
+                                </div>
+                                <form method="post" action="{% url 'add-section-to-landing-page' landing_page.id section.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-plus"></i> Add
+                                    </button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>No available sections to add. Please <a href="{% url 'admin-sections' %}">create new sections</a> first.</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const sectionsList = document.getElementById('sectionsList');
+        const sectionOrder = document.getElementById('sectionOrder');
+        const saveOrderBtn = document.getElementById('saveOrderBtn');
+        
+        if (sectionsList) {
+            const sortable = new Sortable(sectionsList, {
+                animation: 150,
+                ghostClass: 'bg-light',
+                onEnd: function() {
+                    // Show save button when order changes
+                    saveOrderBtn.style.display = 'inline-block';
+                    
+                    // Update the hidden input with the new order
+                    const items = sectionsList.querySelectorAll('.sortable-item');
+                    const ids = Array.from(items).map(item => item.dataset.id);
+                    sectionOrder.value = ids.join(',');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
+
+{% endblock %} 

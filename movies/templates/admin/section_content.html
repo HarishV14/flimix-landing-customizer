@@ -1,0 +1,263 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Section Content{% endblock %}
+
+{% block page_title %}Content for "{{ section.name }}"{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'admin-sections' %}" class="btn btn-outline-secondary me-2">
+    <i class="fas fa-arrow-left"></i> Back to Sections
+</a>
+{% if section.content_selection_type == 'manual' %}
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addContentModal">
+    <i class="fas fa-plus"></i> Add Content
+</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Section Information</h5>
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Name:</strong> {{ section.name }}</p>
+                <p><strong>Type:</strong> {{ section.get_section_type_display }}</p>
+            </div>
+            <div class="col-md-6">
+                <p>
+                    <strong>Content Selection:</strong> 
+                    {% if section.content_selection_type == 'automatic' %}
+                        <span class="badge bg-info">Automatic</span>
+                        {% if section.auto_genre %}
+                            <span class="badge bg-light text-dark">{{ section.auto_genre.name }}</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge bg-primary">Manual</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if section.content_selection_type == 'automatic' %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i> This section uses automatic content selection based on genre. Content is automatically selected and ordered by most recent first.
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Movies ({{ movies|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if movies %}
+                        <div class="list-group">
+                            {% for movie in movies %}
+                                <div class="list-group-item d-flex align-items-center">
+                                    <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="img-thumbnail me-3" style="width: 60px;">
+                                    <div>
+                                        <h6 class="mb-0">{{ movie.title }}</h6>
+                                        <small class="text-muted">{{ movie.release_year }}</small>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p>No movies found with genre "{{ section.auto_genre.name }}"</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Series ({{ series|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if series %}
+                        <div class="list-group">
+                            {% for series_item in series %}
+                                <div class="list-group-item d-flex align-items-center">
+                                    <img src="{{ series_item.poster_url }}" alt="{{ series_item.title }}" class="img-thumbnail me-3" style="width: 60px;">
+                                    <div>
+                                        <h6 class="mb-0">{{ series_item.title }}</h6>
+                                        <small class="text-muted">{{ series_item.release_year }} • {{ series_item.seasons }} season(s)</small>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p>No series found with genre "{{ section.auto_genre.name }}"</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% else %}
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Content Items</h5>
+            
+            {% if section_items %}
+                <form id="reorderForm" method="post" action="{% url 'reorder-section-content' section.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="content_order" id="contentOrder">
+                    <div class="mb-3">
+                        <button type="submit" class="btn btn-success" id="saveOrderBtn" style="display: none;">
+                            <i class="fas fa-save"></i> Save Order
+                        </button>
+                    </div>
+                    
+                    <div id="contentList" class="list-group">
+                        {% for item in section_items %}
+                            <div class="list-group-item sortable-item d-flex align-items-center" data-id="{{ item.id }}">
+                                <i class="fas fa-grip-lines me-3"></i>
+                                <img src="{{ item.content_object.poster_url }}" alt="{{ item.content_object.title }}" class="img-thumbnail me-3" style="width: 60px;">
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0">{{ item.content_object.title }}</h6>
+                                    <div>
+                                        {% if item.content_object.get_content_type == 'movie' %}
+                                            <span class="badge bg-primary">Movie</span>
+                                            <small class="text-muted">{{ item.content_object.release_year }} • {{ item.content_object.duration_minutes }} min</small>
+                                        {% else %}
+                                            <span class="badge bg-success">Series</span>
+                                            <small class="text-muted">{{ item.content_object.release_year }} • {{ item.content_object.seasons }} season(s)</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <form method="post" action="{% url 'remove-content-from-section' section.id item.id %}" class="ms-auto">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to remove this item?');">
+                                        <i class="fas fa-times"></i> Remove
+                                    </button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </form>
+            {% else %}
+                <p>No content added to this section yet.</p>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+
+<!-- Add Content Modal -->
+{% if section.content_selection_type == 'manual' %}
+<div class="modal fade" id="addContentModal" tabindex="-1" aria-labelledby="addContentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addContentModalLabel">Add Content to Section</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="contentTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="movies-tab" data-bs-toggle="tab" data-bs-target="#movies" type="button" role="tab" aria-controls="movies" aria-selected="true">Movies</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="series-tab" data-bs-toggle="tab" data-bs-target="#series" type="button" role="tab" aria-controls="series" aria-selected="false">Series</button>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3" id="contentTabsContent">
+                    <div class="tab-pane fade show active" id="movies" role="tabpanel" aria-labelledby="movies-tab">
+                        {% if available_movies %}
+                            <div class="list-group">
+                                {% for movie in available_movies %}
+                                    <div class="list-group-item d-flex align-items-center">
+                                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="img-thumbnail me-3" style="width: 60px;">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0">{{ movie.title }}</h6>
+                                            <small class="text-muted">{{ movie.release_year }} • {{ movie.duration_minutes }} min</small>
+                                            <div>
+                                                {% for genre in movie.genres.all %}
+                                                    <span class="badge bg-secondary">{{ genre.name }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        <form method="post" action="{% url 'add-content-to-section' section.id %}" class="ms-auto">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="content_type" value="movie">
+                                            <input type="hidden" name="content_id" value="{{ movie.id }}">
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-plus"></i> Add
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p>No available movies to add.</p>
+                        {% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="series" role="tabpanel" aria-labelledby="series-tab">
+                        {% if available_series %}
+                            <div class="list-group">
+                                {% for series_item in available_series %}
+                                    <div class="list-group-item d-flex align-items-center">
+                                        <img src="{{ series_item.poster_url }}" alt="{{ series_item.title }}" class="img-thumbnail me-3" style="width: 60px;">
+                                        <div class="flex-grow-1">
+                                            <h6 class="mb-0">{{ series_item.title }}</h6>
+                                            <small class="text-muted">{{ series_item.release_year }} • {{ series_item.seasons }} season(s)</small>
+                                            <div>
+                                                {% for genre in series_item.genres.all %}
+                                                    <span class="badge bg-secondary">{{ genre.name }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        <form method="post" action="{% url 'add-content-to-section' section.id %}" class="ms-auto">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="content_type" value="series">
+                                            <input type="hidden" name="content_id" value="{{ series_item.id }}">
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-plus"></i> Add
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p>No available series to add.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% block extra_scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const contentList = document.getElementById('contentList');
+        const contentOrder = document.getElementById('contentOrder');
+        const saveOrderBtn = document.getElementById('saveOrderBtn');
+        
+        if (contentList) {
+            const sortable = new Sortable(contentList, {
+                animation: 150,
+                ghostClass: 'bg-light',
+                onEnd: function() {
+                    // Show save button when order changes
+                    saveOrderBtn.style.display = 'inline-block';
+                    
+                    // Update the hidden input with the new order
+                    const items = contentList.querySelectorAll('.sortable-item');
+                    const ids = Array.from(items).map(item => item.dataset.id);
+                    contentOrder.value = ids.join(',');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
+
+{% endblock %} 
