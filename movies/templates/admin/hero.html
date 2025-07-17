@@ -1,0 +1,132 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Hero Section{% endblock %}
+
+{% block page_title %}Hero Section Configuration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Current Hero Selection</h5>
+                
+                {% if hero_settings and hero_settings.featured_movie %}
+                    <div class="preview-container">
+                        <div class="preview-hero" style="background-image: url('{{ hero_settings.featured_movie.background_image_url }}');">
+                            <div class="preview-hero-content">
+                                <h3>{{ hero_settings.featured_movie.title }}</h3>
+                                <p>{{ hero_settings.featured_movie.description|truncatechars:150 }}</p>
+                                <button class="btn btn-sm btn-light">Watch Now</button>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning">
+                        No hero movie selected. Please select a movie from the list below.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-12 col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Search Movies</h5>
+                <form id="search-form" class="mb-3">
+                    <div class="input-group">
+                        <input type="text" id="search-input" class="form-control" placeholder="Search by title...">
+                        <button class="btn btn-outline-secondary" type="submit">Search</button>
+                    </div>
+                </form>
+                
+                <div class="mt-3">
+                    <h6>Filter by Category:</h6>
+                    <div class="btn-group mb-3">
+                        <button type="button" class="btn btn-outline-primary btn-sm category-filter active" data-category="all">All</button>
+                        {% for category in categories %}
+                            <button type="button" class="btn btn-outline-primary btn-sm category-filter" data-category="{{ category.id }}">
+                                {{ category.name }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="movie-results">
+    {% for movie in movies %}
+        <div class="col-md-6 col-lg-3 mb-4 movie-item" data-categories="{{ movie.category_ids }}">
+            <div class="card h-100 movie-card {% if hero_settings.featured_movie.id == movie.id %}border border-primary{% endif %}">
+                <img src="{{ movie.poster_url }}" class="card-img-top movie-poster" alt="{{ movie.title }}">
+                <div class="card-body">
+                    <h5 class="card-title">{{ movie.title }}</h5>
+                    <p class="card-text small">{{ movie.description|truncatechars:100 }}</p>
+                </div>
+                <div class="card-footer">
+                    {% if hero_settings.featured_movie.id == movie.id %}
+                        <button class="btn btn-success btn-sm w-100" disabled>
+                            <i class="fas fa-check-circle"></i> Current Hero
+                        </button>
+                    {% else %}
+                        <form method="post" action="{% url 'update-hero' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="movie_id" value="{{ movie.id }}">
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                Set as Hero
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        // Movie search functionality
+        $("#search-form").submit(function(e) {
+            e.preventDefault();
+            const searchTerm = $("#search-input").val().toLowerCase();
+            
+            $(".movie-item").each(function() {
+                const title = $(this).find(".card-title").text().toLowerCase();
+                const description = $(this).find(".card-text").text().toLowerCase();
+                
+                if (title.includes(searchTerm) || description.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+        
+        // Category filter
+        $(".category-filter").click(function() {
+            $(".category-filter").removeClass("active");
+            $(this).addClass("active");
+            
+            const categoryId = $(this).data("category");
+            
+            if (categoryId === "all") {
+                $(".movie-item").show();
+            } else {
+                $(".movie-item").each(function() {
+                    const categories = $(this).data("categories").toString().split(",");
+                    if (categories.includes(categoryId.toString())) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            }
+        });
+    });
+</script>
+{% endblock %} 

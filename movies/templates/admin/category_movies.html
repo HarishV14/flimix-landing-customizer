@@ -1,0 +1,146 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ category.name }} Movies{% endblock %}
+
+{% block page_title %}{{ category.name }} - Movie Management{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'admin-categories' %}" class="btn btn-outline-secondary me-2">
+    <i class="fas fa-arrow-left"></i> Back to Categories
+</a>
+<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMovieModal">
+    <i class="fas fa-plus"></i> Add Movie
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Carousel Preview</h5>
+        <div class="preview-carousel">
+            <h5 class="preview-carousel-title">{{ category.name }}</h5>
+            <div class="preview-movie-cards">
+                {% for category_movie in category_movies %}
+                    <div class="preview-movie-card">
+                        <img src="{{ category_movie.movie.poster_url }}" alt="{{ category_movie.movie.title }}" class="img-fluid">
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <h5 class="card-title">Movie Order</h5>
+        <p class="text-muted">Drag and drop to reorder movies. The order here determines how movies appear in the carousel.</p>
+        
+        {% if category_movies %}
+            <div id="sortable-movies" class="mb-4">
+                {% for category_movie in category_movies %}
+                    <div class="sortable-item d-flex justify-content-between align-items-center" data-id="{{ category_movie.id }}">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-grip-vertical me-3 text-muted"></i>
+                            <img src="{{ category_movie.movie.poster_url }}" alt="{{ category_movie.movie.title }}" class="img-thumbnail me-3" style="height: 60px;">
+                            <span class="fw-bold">{{ category_movie.movie.title }}</span>
+                        </div>
+                        <div>
+                            <form method="post" action="{% url 'remove-movie-from-category' category.id category_movie.movie.id %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                        onclick="return confirm('Are you sure you want to remove this movie from the category?')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+            
+            <form id="reorderForm" method="post" action="{% url 'reorder-category-movies' category.id %}">
+                {% csrf_token %}
+                <input type="hidden" id="movieOrder" name="movie_order" value="">
+                <button type="submit" id="saveOrderBtn" class="btn btn-primary" disabled>Save Order</button>
+            </form>
+        {% else %}
+            <div class="alert alert-info">
+                No movies in this category yet. Add movies using the "Add Movie" button above.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Movie Modal -->
+<div class="modal fade" id="addMovieModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Movie to {{ category.name }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" id="movie-search" class="form-control" placeholder="Search movies...">
+                </div>
+                
+                <div class="row" id="movie-results">
+                    {% for movie in available_movies %}
+                        <div class="col-md-4 col-lg-3 mb-4 movie-item">
+                            <div class="card h-100 movie-card">
+                                <img src="{{ movie.poster_url }}" class="card-img-top movie-thumbnail" alt="{{ movie.title }}">
+                                <div class="card-body">
+                                    <h6 class="card-title">{{ movie.title }}</h6>
+                                </div>
+                                <div class="card-footer">
+                                    <form method="post" action="{% url 'add-movie-to-category' category.id movie.id %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-primary btn-sm w-100">Add</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                All movies are already in this category.
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    $(document).ready(function() {
+        // Initialize sortable for movies
+        const sortableMovies = new Sortable(document.getElementById('sortable-movies'), {
+            animation: 150,
+            ghostClass: 'bg-light',
+            onEnd: function() {
+                // Enable the save button when order changes
+                $("#saveOrderBtn").prop("disabled", false);
+                
+                // Update the hidden input with the new order
+                const movieIds = [];
+                $("#sortable-movies .sortable-item").each(function() {
+                    movieIds.push($(this).data("id"));
+                });
+                $("#movieOrder").val(movieIds.join(','));
+            }
+        });
+        
+        // Movie search in modal
+        $("#movie-search").on("keyup", function() {
+            const value = $(this).val().toLowerCase();
+            $(".movie-item").filter(function() {
+                const title = $(this).find(".card-title").text().toLowerCase();
+                $(this).toggle(title.indexOf(value) > -1);
+            });
+        });
+    });
+</script>
+{% endblock %} 

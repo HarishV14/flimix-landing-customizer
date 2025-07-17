@@ -1,0 +1,105 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-photo-film me-2"></i> Hero Section</h5>
+                {% if hero_settings and hero_settings.featured_movie %}
+                    <div class="preview-container">
+                        <div class="preview-hero" style="background-image: url('{{ hero_settings.featured_movie.background_image_url }}');">
+                            <div class="preview-hero-content">
+                                <h3>{{ hero_settings.featured_movie.title }}</h3>
+                                <p>{{ hero_settings.featured_movie.description|truncatechars:100 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <p>No hero movie selected</p>
+                {% endif %}
+                <a href="{% url 'admin-hero' %}" class="btn btn-primary">Configure Hero</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-8 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-layer-group me-2"></i> Categories</h5>
+                {% if categories %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Name</th>
+                                    <th>Movies</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for category in categories %}
+                                <tr>
+                                    <td>{{ category.position }}</td>
+                                    <td>{{ category.name }}</td>
+                                    <td>{{ category.movie_count }}</td>
+                                    <td>
+                                        <a href="{% url 'admin-category-movies' category.id %}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-film"></i> Manage Movies
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p>No categories created yet</p>
+                {% endif %}
+                <a href="{% url 'admin-categories' %}" class="btn btn-primary">Manage Categories</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Landing Page Preview</h5>
+                <div class="preview-container mb-4">
+                    {% if hero_settings and hero_settings.featured_movie %}
+                        <div class="preview-hero" style="background-image: url('{{ hero_settings.featured_movie.background_image_url }}');">
+                            <div class="preview-hero-content">
+                                <h3>{{ hero_settings.featured_movie.title }}</h3>
+                                <p>{{ hero_settings.featured_movie.description|truncatechars:100 }}</p>
+                                <button class="btn btn-sm btn-light">Watch Now</button>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% for category in categories %}
+                    {% if category.movies.all %}
+                        <div class="preview-carousel">
+                            <h5 class="preview-carousel-title">{{ category.name }}</h5>
+                            <div class="preview-movie-cards">
+                                {% for movie in category.movies.all %}
+                                    <div class="preview-movie-card">
+                                        <img src="{{ movie.poster_url }}" alt="{{ movie.title }}" class="img-fluid">
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
