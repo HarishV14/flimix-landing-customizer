@@ -4,7 +4,7 @@ import { getSectionTypes } from '../lib/sectionRegistry';
  * Section Sidebar Component
  * Displays the available section templates for drag and drop
  */
-export default function SectionSidebar({ onDragStart }) {
+export default function SectionSidebar({ onDragStart, setIsSidebarDragging }) {
   const sectionTypes = getSectionTypes();
   
   return (
@@ -19,7 +19,11 @@ export default function SectionSidebar({ onDragStart }) {
               <div
                 key={template.id}
                 draggable
-                onDragStart={(e) => onDragStart(e, template)}
+                onDragStart={e => {
+                  onDragStart(e, template);
+                  setIsSidebarDragging && setIsSidebarDragging(true);
+                }}
+                onDragEnd={() => setIsSidebarDragging && setIsSidebarDragging(false)}
                 className="border border-gray-200 rounded-lg p-3 cursor-move hover:border-blue-300 hover:shadow-sm transition-all"
               >
                 <div className="flex items-center gap-3 mb-2">

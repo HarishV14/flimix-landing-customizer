@@ -15,7 +15,6 @@ import {
 
 // Import our new components
 import SectionSidebar from '../components/SectionSidebar';
-import PageCanvas from '../components/PageCanvas';
 import SectionProperties from '../components/SectionProperties';
 import SectionWidget from '../components/SectionWidget'; // Added import for SectionWidget
 import { getSectionType } from '../lib/sectionRegistry'; // Add this import
@@ -30,6 +29,7 @@ export default function PageBuilder() {
   const [draggedSectionIndex, setDraggedSectionIndex] = useState(null);
   const [isSectionDragging, setIsSectionDragging] = useState(false);
   const [isContentDragging, setIsContentDragging] = useState(false);
+  const [isSidebarDragging, setIsSidebarDragging] = useState(false);
   
   const queryClient = useQueryClient();
 
@@ -238,6 +238,44 @@ export default function PageBuilder() {
     setIsSectionDragging(false);
   };
 
+  // Sidebar drag handlers
+  const handleSidebarDragOver = (e) => {
+    e.preventDefault();
+  };
+  const handleSidebarDrop = async (e) => {
+    e.preventDefault();
+    setIsSidebarDragging(false);
+    const template = JSON.parse(e.dataTransfer.getData('application/json'));
+    if (!selectedLandingPage) {
+      toast.error('Please select a landing page first');
+      return;
+    }
+    try {
+      // Create new section in backend
+      const newSection = await createSectionMutation.mutateAsync({
+        name: template.name,
+        section_type: template.id,
+        content_selection_type: 'manual'
+      });
+      // Add section to landing page
+      await addSectionToLandingPageMutation.mutateAsync({
+        landingPageId: selectedLandingPage.id,
+        sectionId: newSection.id
+      });
+      // Refetch landing pages and update selectedLandingPage
+      const landingPages = await queryClient.fetchQuery({
+        queryKey: ['landing-pages'],
+        queryFn: endpoints.landingPages,
+      });
+      const updated = landingPages.find(lp => lp.id === selectedLandingPage.id);
+      setSelectedLandingPage(updated);
+      toast.success('Section added!');
+    } catch (error) {
+      console.error('Error adding section:', error);
+      toast.error('Failed to add section');
+    }
+  };
+
   // Persist selectedLandingPage to localStorage
   useEffect(() => {
     if (selectedLandingPage?.id) {
@@ -328,7 +366,7 @@ export default function PageBuilder() {
       <div className="flex-1 flex">
         {/* Left Sidebar - Elements Library */}
         {!isPreviewMode && (
-          <SectionSidebar onDragStart={handleDragStart} />
+          <SectionSidebar onDragStart={handleDragStart} setIsSidebarDragging={setIsSidebarDragging} />
         )}
 
         {/* Main Canvas */}
@@ -349,40 +387,45 @@ export default function PageBuilder() {
           )}
 
           {/* Canvas Area with drag-and-drop for sections */}
-          <div className={`mx-auto transition-all duration-300 ${
-            viewport === 'desktop' ? 'max-w-none' :
-            viewport === 'tablet' ? 'max-w-2xl' :
-            'max-w-sm'
-          }`}>
-            {selectedLandingPage?.landingpagesection_set?.map((section, idx) => (
-              <div
-                key={section.section.id}
-                draggable={!isContentDragging}
-                onDragStart={!isContentDragging ? (e) => handleSectionDragStart(e, idx) : undefined}
-                onDragOver={!isContentDragging ? (e) => handleSectionDragOver(e, idx) : undefined}
-                onDrop={!isContentDragging ? (e) => handleSectionDrop(e, idx) : undefined}
-              >
-                <SectionWidget
-                  section={section}
-                  isSelected={selectedSection?.section.id === section.section.id}
-                  template={getSectionType(section.section.section_type)}
-                  onSectionSelect={handleSectionSelect}
-                  onOpenContentManager={handleOpenContentManager}
-                  onSectionDelete={handleSectionDelete}
-                  onRemoveContent={(contentId) => handleRemoveContent(section.section.id, contentId)}
-                  isSectionDragging={isSectionDragging}
-                  isContentDragging={isContentDragging}
-                  setIsContentDragging={setIsContentDragging}
-                />
-              </div>
-            )) || (
-              <div className="flex items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg m-4">
-                <div className="text-center">
-                  <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600">Drag elements here to build your page</p>
+          <div
+            onDragOver={isSidebarDragging ? handleSidebarDragOver : undefined}
+            onDrop={isSidebarDragging ? handleSidebarDrop : undefined}
+          >
+            <div className={`mx-auto transition-all duration-300 ${
+              viewport === 'desktop' ? 'max-w-none' :
+              viewport === 'tablet' ? 'max-w-2xl' :
+              'max-w-sm'
+            }`}>
+              {selectedLandingPage?.landingpagesection_set?.map((section, idx) => (
+                <div
+                  key={section.section.id}
+                  draggable={!isContentDragging && !isSidebarDragging}
+                  onDragStart={!isContentDragging && !isSidebarDragging ? (e) => handleSectionDragStart(e, idx) : undefined}
+                  onDragOver={!isContentDragging && !isSidebarDragging ? (e) => handleSectionDragOver(e, idx) : undefined}
+                  onDrop={!isContentDragging && !isSidebarDragging ? (e) => handleSectionDrop(e, idx) : undefined}
+                >
+                  <SectionWidget
+                    section={section}
+                    isSelected={selectedSection?.section.id === section.section.id}
+                    template={getSectionType(section.section.section_type)}
+                    onSectionSelect={handleSectionSelect}
+                    onOpenContentManager={handleOpenContentManager}
+                    onSectionDelete={handleSectionDelete}
+                    onRemoveContent={(contentId) => handleRemoveContent(section.section.id, contentId)}
+                    isSectionDragging={isSectionDragging}
+                    isContentDragging={isContentDragging}
+                    setIsContentDragging={setIsContentDragging}
+                  />
                 </div>
-              </div>
-            )}
+              )) || (
+                <div className="flex items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg m-4">
+                  <div className="text-center">
+                    <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600">Drag elements here to build your page</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
