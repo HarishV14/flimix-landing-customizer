@@ -9,13 +9,16 @@ import {
   Smartphone,
   Tablet,
   Monitor as Desktop,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 
 // Import our new components
 import SectionSidebar from '../components/SectionSidebar';
 import PageCanvas from '../components/PageCanvas';
 import SectionProperties from '../components/SectionProperties';
+import SectionWidget from '../components/SectionWidget'; // Added import for SectionWidget
+import { getSectionType } from '../lib/sectionRegistry'; // Add this import
 
 export default function PageBuilder() {
   // Core state
@@ -24,6 +27,9 @@ export default function PageBuilder() {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [viewport, setViewport] = useState('desktop');
   const [showContentManager, setShowContentManager] = useState(false);
+  const [draggedSectionIndex, setDraggedSectionIndex] = useState(null);
+  const [isSectionDragging, setIsSectionDragging] = useState(false);
+  const [isContentDragging, setIsContentDragging] = useState(false);
   
   const queryClient = useQueryClient();
 
@@ -103,47 +109,7 @@ export default function PageBuilder() {
     e.dataTransfer.setData('application/json', JSON.stringify(serializableTemplate));
   };
 
-  const handleDragOver = (e) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = async (e) => {
-    e.preventDefault();
-    const template = JSON.parse(e.dataTransfer.getData('application/json'));
-
-    if (!selectedLandingPage) {
-      toast.error('Please select a landing page first');
-      return;
-    }
-
-    try {
-      // Create new section in backend
-      const newSection = await createSectionMutation.mutateAsync({
-        name: template.name,
-        section_type: template.id,
-        content_selection_type: 'manual'
-      });
-
-      // Add section to landing page
-      await addSectionToLandingPageMutation.mutateAsync({
-        landingPageId: selectedLandingPage.id,
-        sectionId: newSection.id
-      });
-
-      // Refetch landing pages and update selectedLandingPage
-      const landingPages = await queryClient.fetchQuery({
-        queryKey: ['landing-pages'],
-        queryFn: endpoints.landingPages,
-      });
-      const updated = landingPages.find(lp => lp.id === selectedLandingPage.id);
-      setSelectedLandingPage(updated);
-
-      toast.success('Section added!');
-    } catch (error) {
-      console.error('Error adding section:', error);
-      toast.error('Failed to add section');
-    }
-  };
+  // Removed handleDrop and handleDragOver as they are not used
 
   const handleSectionSelect = (section) => {
     setSelectedSection(section);
@@ -226,6 +192,50 @@ export default function PageBuilder() {
 
   const handleRemoveContent = (sectionId, contentId) => {
     removeContentMutation.mutate({ sectionId, itemId: contentId });
+  };
+
+  // Drag-and-drop handlers for section reordering
+
+  /**
+   * Called when a section drag starts. Stores the index of the dragged section.
+   */
+  const handleSectionDragStart = (e, idx) => {
+    setDraggedSectionIndex(idx);
+    setIsSectionDragging(true);
+  };
+
+  /**
+   * Called when a dragged section is over a drop target. Required to allow dropping.
+   */
+  const handleSectionDragOver = (e, idx) => {
+    e.preventDefault(); // Must call this to allow dropping
+  };
+
+  /**
+   * Called when a dragged section is dropped on a new position.
+   * Reorders the sections in the frontend and backend.
+   */
+  const handleSectionDrop = async (e, idx) => {
+    e.preventDefault();
+    if (draggedSectionIndex === null || draggedSectionIndex === idx) return;
+    if (!selectedLandingPage) return;
+
+    // 1. Reorder the array in the frontend (for immediate feedback)
+    const newOrder = [...selectedLandingPage.landingpagesection_set];
+    const [moved] = newOrder.splice(draggedSectionIndex, 1);
+    newOrder.splice(idx, 0, moved);
+
+    // 2. Update the backend
+    const orderString = newOrder.map(s => s.id).join(',');
+    await endpoints.reorderLandingPageSections(selectedLandingPage.id, { section_order: orderString });
+
+    // 3. Update local state for instant UI feedback
+    setSelectedLandingPage({
+      ...selectedLandingPage,
+      landingpagesection_set: newOrder
+    });
+    setDraggedSectionIndex(null);
+    setIsSectionDragging(false);
   };
 
   // Persist selectedLandingPage to localStorage
@@ -338,19 +348,42 @@ export default function PageBuilder() {
             </div>
           )}
 
-          {/* Canvas Area */}
-          <PageCanvas
-            selectedLandingPage={selectedLandingPage}
-            selectedSection={selectedSection}
-            viewport={viewport}
-            isPreviewMode={isPreviewMode}
-            onSectionSelect={handleSectionSelect}
-            onOpenContentManager={handleOpenContentManager}
-            onSectionDelete={handleSectionDelete}
-            onRemoveContent={handleRemoveContent}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          />
+          {/* Canvas Area with drag-and-drop for sections */}
+          <div className={`mx-auto transition-all duration-300 ${
+            viewport === 'desktop' ? 'max-w-none' :
+            viewport === 'tablet' ? 'max-w-2xl' :
+            'max-w-sm'
+          }`}>
+            {selectedLandingPage?.landingpagesection_set?.map((section, idx) => (
+              <div
+                key={section.section.id}
+                draggable={!isContentDragging}
+                onDragStart={!isContentDragging ? (e) => handleSectionDragStart(e, idx) : undefined}
+                onDragOver={!isContentDragging ? (e) => handleSectionDragOver(e, idx) : undefined}
+                onDrop={!isContentDragging ? (e) => handleSectionDrop(e, idx) : undefined}
+              >
+                <SectionWidget
+                  section={section}
+                  isSelected={selectedSection?.section.id === section.section.id}
+                  template={getSectionType(section.section.section_type)}
+                  onSectionSelect={handleSectionSelect}
+                  onOpenContentManager={handleOpenContentManager}
+                  onSectionDelete={handleSectionDelete}
+                  onRemoveContent={(contentId) => handleRemoveContent(section.section.id, contentId)}
+                  isSectionDragging={isSectionDragging}
+                  isContentDragging={isContentDragging}
+                  setIsContentDragging={setIsContentDragging}
+                />
+              </div>
+            )) || (
+              <div className="flex items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg m-4">
+                <div className="text-center">
+                  <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600">Drag elements here to build your page</p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Right Sidebar - Properties Panel */}

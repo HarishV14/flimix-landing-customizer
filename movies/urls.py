@@ -17,6 +17,7 @@ urlpatterns = [
     path('sections/<int:section_id>/content/', views.api_section_content, name='api-section-content'),
     path('sections/<int:section_id>/content/add/', views.api_add_content_to_section, name='api-add-content-to-section'),
     path('sections/<int:section_id>/content/<int:item_id>/remove/', views.api_remove_content_from_section, name='api-remove-content-from-section'),
+    path('sections/<int:section_id>/content/reorder/', views.api_reorder_section_content, name='api-reorder-section-content'),
     
     # Landing Page Management
     path('landing-pages/<int:landing_page_id>/update/', views.api_update_landing_page, name='api-update-landing-page'),

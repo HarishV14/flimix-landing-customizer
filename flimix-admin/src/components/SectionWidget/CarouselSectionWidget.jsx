@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Plus, Settings, Trash2 } from 'lucide-react';
+import { endpoints } from '../../lib/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * Carousel Section Widget Component
@@ -10,8 +13,36 @@ export default function CarouselSectionWidget({
   isSelected, 
   onOpenContentManager,
   onRemoveContent,
-  isContentLoading
+  isContentLoading,
+  isSectionDragging,
+  isContentDragging,
+  setIsContentDragging
 }) {
+  const [draggedIndex, setDraggedIndex] = useState(null);
+  const queryClient = useQueryClient();
+
+  // Drag-and-drop handlers for carousel content
+  const handleContentDragStart = (idx) => {
+    setDraggedIndex(idx);
+    setIsContentDragging && setIsContentDragging(true);
+  };
+
+  const handleContentDragOver = (e) => {
+    e.preventDefault();
+  };
+
+  const handleContentDrop = async (dropIdx) => {
+    if (draggedIndex === null || draggedIndex === dropIdx) return;
+    const newOrder = [...sectionContent];
+    const [moved] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(dropIdx, 0, moved);
+    const orderString = newOrder.map(item => item.id).join(',');
+    await endpoints.reorderSectionContent(section.section.id, { content_order: orderString });
+    queryClient.invalidateQueries(['section-content', section.section.id]);
+    setDraggedIndex(null);
+    setIsContentDragging && setIsContentDragging(false);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -34,9 +65,13 @@ export default function CarouselSectionWidget({
         {isContentLoading ? (
           <div className="flex items-center justify-center h-32 w-full text-gray-400">Loading...</div>
         ) : sectionContent.length > 0 ? (
-          sectionContent.map((item) => (
+          sectionContent.map((item, idx) => (
             <div 
               key={item.id} 
+              draggable={!isSectionDragging}
+              onDragStart={!isSectionDragging ? () => handleContentDragStart(idx) : undefined}
+              onDragOver={!isSectionDragging ? handleContentDragOver : undefined}
+              onDrop={!isSectionDragging ? () => handleContentDrop(idx) : undefined}
               className="flex-shrink-0 w-48 h-64 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex flex-col items-center justify-center overflow-hidden"
             >
               <img
