@@ -5,10 +5,132 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count, Max
 from django.views.decorators.http import require_POST
 from django.contrib.contenttypes.models import ContentType
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from .models import (
     Movie, Series, Genre, Section, SectionItem, 
     LandingPage, LandingPageSection
 )
+import json
+
+# API Views for React Frontend
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_landing_pages(request):
+    """API endpoint for landing pages list"""
+    try:
+        landing_pages = LandingPage.objects.all().order_by('-is_active', '-updated_at')
+        data = []
+        for lp in landing_pages:
+            landing_page_sections = LandingPageSection.objects.filter(
+                landing_page=lp
+            ).select_related('section').order_by('position')
+            data.append({
+                'id': lp.id,
+                'name': lp.name,
+                'is_active': lp.is_active,
+                'created_at': lp.created_at.isoformat(),
+                'updated_at': lp.updated_at.isoformat(),
+                'landingpagesection_set': [
+                    {
+                        'id': lp_section.id,
+                        'position': lp_section.position,
+                        'section': {
+                            'id': lp_section.section.id,
+                            'name': lp_section.section.name,
+                            'section_type': lp_section.section.section_type,
+                            'content_selection_type': lp_section.section.content_selection_type,
+                        }
+                    }
+                    for lp_section in landing_page_sections
+                ]
+            })
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_sections(request):
+    """API endpoint for sections list"""
+    try:
+        sections = Section.objects.annotate(
+            content_count=Count('sectionitem')
+        ).order_by('position')
+        
+        data = [
+            {
+                'id': section.id,
+                'name': section.name,
+                'section_type': section.section_type,
+                'content_selection_type': section.content_selection_type,
+                'position': section.position,
+                'content_count': section.content_count,
+            }
+            for section in sections
+        ]
+        
+        return JsonResponse(data, safe=False)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_movies(request):
+    """API endpoint for movies list"""
+    try:
+        movies = Movie.objects.all().order_by('title')
+        
+        data = [
+            {
+                'id': movie.id,
+                'title': movie.title,
+                'description': movie.description,
+                'poster_url': movie.poster_url,
+                'background_image_url': movie.background_image_url,
+                'link': movie.link,
+                'duration_minutes': movie.duration_minutes,
+                'release_year': movie.release_year,
+                'created_at': movie.created_at.isoformat(),
+                'genres': [genre.name for genre in movie.genres.all()],
+            }
+            for movie in movies
+        ]
+        
+        return JsonResponse(data, safe=False)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_series(request):
+    """API endpoint for series list"""
+    try:
+        series_list = Series.objects.all().order_by('title')
+        
+        data = [
+            {
+                'id': series.id,
+                'title': series.title,
+                'description': series.description,
+                'poster_url': series.poster_url,
+                'background_image_url': series.background_image_url,
+                'link': series.link,
+                'seasons': series.seasons,
+                'episodes_count': series.episodes_count,
+                'release_year': series.release_year,
+                'created_at': series.created_at.isoformat(),
+                'genres': [genre.name for genre in series.genres.all()],
+            }
+            for series in series_list
+        ]
+        
+        return JsonResponse(data, safe=False)
+    
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 def page_data(request):
     """
@@ -33,11 +155,13 @@ def page_data(request):
         for lp_section in landing_page_sections:
             section = lp_section.section
             
-            # Create the section JSON based on its type
+            # Always use section.name as the title
+            print(section.settings)
+            print(section.name)
             section_json = {
                 "type": section.section_type,
                 "attributes": {
-                    "title": section.name,
+                    "title": section.settings.get('title', section.name),
                     **section.settings  # Include any additional settings
                 },
                 "children": []
@@ -61,12 +185,12 @@ def page_data(request):
                     if content is not None:
                         section_json["attributes"].update({
                             "backgroundImage": content.background_image_url,
-                            "title": content.title,
+                            "title": content.title,  # This is the movie/series title
                             "description": content.description,
                             "contentType": content_type,
                             "cta": {"text": "Watch Now", "link": content.link}
                         })
-                    
+                
             else:
                 # For other section types (carousel, grid, etc.)
                 for item in content_items:
@@ -774,3 +898,586 @@ def delete_series(request, series_id):
     messages.success(request, f"Series '{title}' deleted successfully")
     
     return redirect('admin-series')
+
+# API CRUD Views for React Frontend
+
+# Movie CRUD
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_movie_detail(request, movie_id):
+    """API endpoint for single movie detail"""
+    try:
+        movie = get_object_or_404(Movie, id=movie_id)
+        data = {
+            'id': movie.id,
+            'title': movie.title,
+            'description': movie.description,
+            'poster_url': movie.poster_url,
+            'background_image_url': movie.background_image_url,
+            'link': movie.link,
+            'duration_minutes': movie.duration_minutes,
+            'release_year': movie.release_year,
+            'created_at': movie.created_at.isoformat(),
+            'genres': [genre.name for genre in movie.genres.all()],
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_movie(request):
+    """API endpoint for creating a movie"""
+    try:
+        data = json.loads(request.body)
+        movie = Movie.objects.create(
+            title=data['title'],
+            description=data['description'],
+            poster_url=data['poster_url'],
+            background_image_url=data['background_image_url'],
+            link=data.get('link', '#'),
+            duration_minutes=data.get('duration_minutes', 0),
+            release_year=data.get('release_year')
+        )
+        
+        # Add genres
+        if 'genre_ids' in data and data['genre_ids']:
+            genres = Genre.objects.filter(id__in=data['genre_ids'])
+            movie.genres.set(genres)
+        
+        return JsonResponse({'id': movie.id, 'message': 'Movie created successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def api_update_movie(request, movie_id):
+    """API endpoint for updating a movie"""
+    try:
+        movie = get_object_or_404(Movie, id=movie_id)
+        data = json.loads(request.body)
+        
+        movie.title = data['title']
+        movie.description = data['description']
+        movie.poster_url = data['poster_url']
+        movie.background_image_url = data['background_image_url']
+        movie.link = data.get('link', '#')
+        movie.duration_minutes = data.get('duration_minutes', 0)
+        movie.release_year = data.get('release_year')
+        movie.save()
+        
+        # Update genres
+        if 'genre_ids' in data:
+            genres = Genre.objects.filter(id__in=data['genre_ids'])
+            movie.genres.set(genres)
+        
+        return JsonResponse({'message': 'Movie updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_movie(request, movie_id):
+    """API endpoint for deleting a movie"""
+    try:
+        movie = get_object_or_404(Movie, id=movie_id)
+        movie.delete()
+        return JsonResponse({'message': 'Movie deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Series CRUD
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_series_detail(request, series_id):
+    """API endpoint for single series detail"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        data = {
+            'id': series.id,
+            'title': series.title,
+            'description': series.description,
+            'poster_url': series.poster_url,
+            'background_image_url': series.background_image_url,
+            'link': series.link,
+            'seasons': series.seasons,
+            'episodes_count': series.episodes_count,
+            'release_year': series.release_year,
+            'created_at': series.created_at.isoformat(),
+            'genres': [genre.name for genre in series.genres.all()],
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_series(request):
+    """API endpoint for creating a series"""
+    try:
+        data = json.loads(request.body)
+        series = Series.objects.create(
+            title=data['title'],
+            description=data['description'],
+            poster_url=data['poster_url'],
+            background_image_url=data['background_image_url'],
+            link=data.get('link', '#'),
+            seasons=data.get('seasons', 1),
+            episodes_count=data.get('episodes_count', 0),
+            release_year=data.get('release_year')
+        )
+        
+        # Add genres
+        if 'genre_ids' in data and data['genre_ids']:
+            genres = Genre.objects.filter(id__in=data['genre_ids'])
+            series.genres.set(genres)
+        
+        return JsonResponse({'id': series.id, 'message': 'Series created successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def api_update_series(request, series_id):
+    """API endpoint for updating a series"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        data = json.loads(request.body)
+        
+        series.title = data['title']
+        series.description = data['description']
+        series.poster_url = data['poster_url']
+        series.background_image_url = data['background_image_url']
+        series.link = data.get('link', '#')
+        series.seasons = data.get('seasons', 1)
+        series.episodes_count = data.get('episodes_count', 0)
+        series.release_year = data.get('release_year')
+        series.save()
+        
+        # Update genres
+        if 'genre_ids' in data:
+            genres = Genre.objects.filter(id__in=data['genre_ids'])
+            series.genres.set(genres)
+        
+        return JsonResponse({'message': 'Series updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_series(request, series_id):
+    """API endpoint for deleting a series"""
+    try:
+        series = get_object_or_404(Series, id=series_id)
+        series.delete()
+        return JsonResponse({'message': 'Series deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Genre CRUD
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_genre_detail(request, genre_id):
+    """API endpoint for single genre detail"""
+    try:
+        genre = get_object_or_404(Genre, id=genre_id)
+        data = {
+            'id': genre.id,
+            'name': genre.name,
+            'movie_count': genre.movies.count(),
+            'series_count': genre.series.count(),
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_genre(request):
+    """API endpoint for creating a genre"""
+    try:
+        data = json.loads(request.body)
+        genre = Genre.objects.create(name=data['name'])
+        return JsonResponse({'id': genre.id, 'message': 'Genre created successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def api_update_genre(request, genre_id):
+    """API endpoint for updating a genre"""
+    try:
+        genre = get_object_or_404(Genre, id=genre_id)
+        data = json.loads(request.body)
+        genre.name = data['name']
+        genre.save()
+        return JsonResponse({'message': 'Genre updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_genre(request, genre_id):
+    """API endpoint for deleting a genre"""
+    try:
+        genre = get_object_or_404(Genre, id=genre_id)
+        genre.delete()
+        return JsonResponse({'message': 'Genre deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Section CRUD
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_section_detail(request, section_id):
+    """API endpoint for single section detail"""
+    try:
+        section = get_object_or_404(Section, id=section_id)
+        data = {
+            'id': section.id,
+            'name': section.name,
+            'section_type': section.section_type,
+            'content_selection_type': section.content_selection_type,
+            'position': section.position,
+            'content_count': section.sectionitem_set.count(),
+            'auto_genre_id': section.auto_genre.id if section.auto_genre else None,
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_section(request):
+    """API endpoint for creating a section"""
+    try:
+        data = json.loads(request.body)
+        
+        # Get max position for new section
+        max_position = Section.objects.all().aggregate(max_pos=Max('position'))['max_pos']
+        position = 0 if max_position is None else max_position + 1
+        
+        section = Section.objects.create(
+            name=data['name'],
+            section_type=data['section_type'],
+            content_selection_type=data.get('content_selection_type', 'manual'),
+            position=position
+        )
+        
+        # Set auto genre if automatic selection
+        if data.get('content_selection_type') == 'automatic' and data.get('auto_genre_id'):
+            try:
+                genre = Genre.objects.get(id=data['auto_genre_id'])
+                section.auto_genre = genre
+                section.save()
+            except Genre.DoesNotExist:
+                pass
+        
+        return JsonResponse({'id': section.id, 'message': 'Section created successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def api_update_section(request, section_id):
+    """API endpoint for updating a section"""
+    try:
+        section = get_object_or_404(Section, id=section_id)
+        data = json.loads(request.body)
+        section.name = data.get('name', section.name)
+        section.content_selection_type = data.get('content_selection_type', 'manual')
+        # Save settings if present
+        if 'settings' in data:
+            section.settings = data['settings']
+        # Update auto genre if automatic selection
+        if data.get('content_selection_type') == 'automatic' and data.get('auto_genre_id'):
+            try:
+                genre = Genre.objects.get(id=data['auto_genre_id'])
+                section.auto_genre = genre
+            except Genre.DoesNotExist:
+                section.auto_genre = None
+        else:
+            section.auto_genre = None
+        section.save()
+        return JsonResponse({'message': 'Section updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_section(request, section_id):
+    """API endpoint for deleting a section"""
+    try:
+        section = get_object_or_404(Section, id=section_id)
+        section.delete()
+        return JsonResponse({'message': 'Section deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_reorder_sections(request):
+    """API endpoint for reordering sections"""
+    try:
+        data = json.loads(request.body)
+        section_order = data.get('section_order', '')
+        if section_order:
+            section_ids = section_order.split(',')
+            for position, section_id in enumerate(section_ids):
+                try:
+                    section = Section.objects.get(id=section_id)
+                    section.position = position
+                    section.save()
+                except Section.DoesNotExist:
+                    pass
+        return JsonResponse({'message': 'Section order updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Section Content Management
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_section_content(request, section_id):
+    """API endpoint for section content"""
+    try:
+        section = get_object_or_404(Section, id=section_id)
+        section_items = SectionItem.objects.filter(section=section).order_by('position')
+        
+        data = []
+        for item in section_items:
+            content_data = {
+                'id': item.id,
+                'position': item.position,
+                'content_type': item.content_type.model,
+                'content_id': item.object_id,
+            }
+            
+            # Add content details
+            if item.content_object:
+                content_data['content'] = {
+                    'title': item.content_object.title,
+                    'poster_url': item.content_object.poster_url,
+                    'description': item.content_object.description,
+                }
+            
+            data.append(content_data)
+        
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_add_content_to_section(request, section_id):
+    """API endpoint for adding content to section"""
+    try:
+        section = get_object_or_404(Section, id=section_id)
+        data = json.loads(request.body)
+        
+        content_type = data.get('content_type')
+        content_id = data.get('content_id')
+        
+        if content_type and content_id:
+            if content_type == 'movie':
+                content_type_obj = ContentType.objects.get_for_model(Movie)
+            elif content_type == 'series':
+                content_type_obj = ContentType.objects.get_for_model(Series)
+            else:
+                return JsonResponse({'error': 'Invalid content type'}, status=400)
+            
+            # Check if content already exists in section
+            if not SectionItem.objects.filter(
+                section=section, 
+                content_type=content_type_obj,
+                object_id=content_id
+            ).exists():
+                # Get max position for new content
+                max_position = SectionItem.objects.filter(section=section).aggregate(
+                    max_pos=Max('position')
+                )['max_pos']
+                position = 0 if max_position is None else max_position + 1
+                
+                # Add content to section
+                SectionItem.objects.create(
+                    section=section,
+                    content_type=content_type_obj,
+                    object_id=content_id,
+                    position=position
+                )
+                return JsonResponse({'message': 'Content added to section successfully'})
+            else:
+                return JsonResponse({'error': 'Content already exists in section'}, status=400)
+        else:
+            return JsonResponse({'error': 'Content type and ID are required'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_remove_content_from_section(request, section_id, item_id):
+    """API endpoint for removing content from section"""
+    try:
+        section_item = get_object_or_404(SectionItem, id=item_id, section_id=section_id)
+        section_item.delete()
+        return JsonResponse({'message': 'Content removed from section successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_reorder_section_content(request, section_id):
+    """API endpoint for reordering section content"""
+    try:
+        data = json.loads(request.body)
+        content_order = data.get('content_order', '')
+        if content_order:
+            section_item_ids = content_order.split(',')
+            for position, section_item_id in enumerate(section_item_ids):
+                try:
+                    section_item = SectionItem.objects.get(id=section_item_id, section_id=section_id)
+                    section_item.position = position
+                    section_item.save()
+                except SectionItem.DoesNotExist:
+                    pass
+        return JsonResponse({'message': 'Content order updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Landing Page CRUD
+@csrf_exempt
+@require_http_methods(["GET"])
+def api_landing_page_detail(request, landing_page_id):
+    """API endpoint for single landing page detail"""
+    try:
+        landing_page = get_object_or_404(LandingPage, id=landing_page_id)
+        landing_page_sections = LandingPageSection.objects.filter(
+            landing_page=landing_page
+        ).select_related('section').order_by('position')
+        
+        data = {
+            'id': landing_page.id,
+            'name': landing_page.name,
+            'is_active': landing_page.is_active,
+            'created_at': landing_page.created_at.isoformat(),
+            'updated_at': landing_page.updated_at.isoformat(),
+            'landingpagesection_set': [
+                {
+                    'id': lp_section.id,
+                    'position': lp_section.position,
+                    'section': {
+                        'id': lp_section.section.id,
+                        'name': lp_section.section.name,
+                        'section_type': lp_section.section.section_type,
+                        'content_selection_type': lp_section.section.content_selection_type,
+                    }
+                }
+                for lp_section in landing_page_sections
+            ]
+        }
+        return JsonResponse(data)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_create_landing_page(request):
+    """API endpoint for creating a landing page"""
+    try:
+        data = json.loads(request.body)
+        landing_page = LandingPage.objects.create(name=data['name'])
+        return JsonResponse({'id': landing_page.id, 'message': 'Landing page created successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def api_update_landing_page(request, landing_page_id):
+    """API endpoint for updating a landing page"""
+    try:
+        landing_page = get_object_or_404(LandingPage, id=landing_page_id)
+        data = json.loads(request.body)
+        landing_page.name = data['name']
+        landing_page.save()
+        return JsonResponse({'message': 'Landing page updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_landing_page(request, landing_page_id):
+    """API endpoint for deleting a landing page"""
+    try:
+        landing_page = get_object_or_404(LandingPage, id=landing_page_id)
+        if landing_page.is_active:
+            return JsonResponse({'error': 'Cannot delete active landing page'}, status=400)
+        landing_page.delete()
+        return JsonResponse({'message': 'Landing page deleted successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_activate_landing_page(request, landing_page_id):
+    """API endpoint for activating a landing page"""
+    try:
+        landing_page = get_object_or_404(LandingPage, id=landing_page_id)
+        landing_page.activate()
+        return JsonResponse({'message': 'Landing page activated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+# Landing Page Sections Management
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_add_section_to_landing_page(request, landing_page_id, section_id):
+    """API endpoint for adding section to landing page"""
+    try:
+        landing_page = get_object_or_404(LandingPage, id=landing_page_id)
+        section = get_object_or_404(Section, id=section_id)
+        
+        # Check if section already exists in landing page
+        if not LandingPageSection.objects.filter(landing_page=landing_page, section=section).exists():
+            # Get max position for new section
+            max_position = LandingPageSection.objects.filter(landing_page=landing_page).aggregate(
+                max_pos=Max('position')
+            )['max_pos']
+            position = 0 if max_position is None else max_position + 1
+            
+            # Add section to landing page
+            LandingPageSection.objects.create(landing_page=landing_page, section=section, position=position)
+            return JsonResponse({'message': 'Section added to landing page successfully'})
+        else:
+            return JsonResponse({'error': 'Section already exists in landing page'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_remove_section_from_landing_page(request, landing_page_id, section_id):
+    """API endpoint for removing section from landing page"""
+    try:
+        landing_page_section = get_object_or_404(LandingPageSection, landing_page_id=landing_page_id, section_id=section_id)
+        landing_page_section.delete()
+        return JsonResponse({'message': 'Section removed from landing page successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_reorder_landing_page_sections(request, landing_page_id):
+    """API endpoint for reordering landing page sections"""
+    try:
+        data = json.loads(request.body)
+        section_order = data.get('section_order', '')
+        if section_order:
+            landing_page_section_ids = section_order.split(',')
+            for position, landing_page_section_id in enumerate(landing_page_section_ids):
+                try:
+                    landing_page_section = LandingPageSection.objects.get(id=landing_page_section_id, landing_page_id=landing_page_id)
+                    landing_page_section.position = position
+                    landing_page_section.save()
+                except LandingPageSection.DoesNotExist:
+                    pass
+        return JsonResponse({'message': 'Section order updated successfully'})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

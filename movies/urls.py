@@ -2,7 +2,27 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # Core API endpoints needed for Page Builder
     path('page-data/', views.page_data, name='page-data'),
+    path('landing-pages/', views.api_landing_pages, name='api-landing-pages'),
+    path('sections/', views.api_sections, name='api-sections'),
+    path('movies/', views.api_movies, name='api-movies'),
+    path('series/', views.api_series, name='api-series'),
+    
+    # Section Management
+    path('sections/create/', views.api_create_section, name='api-create-section'),
+    path('sections/<int:section_id>/update/', views.api_update_section, name='api-update-section'),
+    
+    # Section Content Management
+    path('sections/<int:section_id>/content/', views.api_section_content, name='api-section-content'),
+    path('sections/<int:section_id>/content/add/', views.api_add_content_to_section, name='api-add-content-to-section'),
+    path('sections/<int:section_id>/content/<int:item_id>/remove/', views.api_remove_content_from_section, name='api-remove-content-from-section'),
+    
+    # Landing Page Management
+    path('landing-pages/<int:landing_page_id>/update/', views.api_update_landing_page, name='api-update-landing-page'),
+    path('landing-pages/<int:landing_page_id>/sections/<int:section_id>/add/', views.api_add_section_to_landing_page, name='api-add-section-to-landing-page'),
+    path('landing-pages/<int:landing_page_id>/sections/<int:section_id>/remove/', views.api_remove_section_from_landing_page, name='api-remove-section-from-landing-page'),
+    path('landing-pages/<int:landing_page_id>/sections/reorder/', views.api_reorder_landing_page_sections, name='api-reorder-landing-page-sections'),
     
     # Custom admin URLs
     path('custom-admin/', views.admin_dashboard, name='admin-dashboard'),

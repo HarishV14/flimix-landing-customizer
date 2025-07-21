@@ -1,120 +1,89 @@
-import { useState, useRef, useEffect } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { endpoints } from '../lib/api'
-import { toast } from 'react-hot-toast'
-import ContentManager from '../components/ContentManager'
-import { 
-  Plus, 
-  Trash2, 
-  Eye, 
-  Settings,
+import { useState, useRef, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { endpoints } from '../lib/api';
+import { toast } from 'react-hot-toast';
+import ContentManager from '../components/ContentManager';
+import {
+  Eye,
   Save,
-  Image,
-  Video,
-  Film,
-  X,
   Smartphone,
   Tablet,
   Monitor as Desktop,
-  Layers
-} from 'lucide-react'
+  X
+} from 'lucide-react';
 
-// Only Hero Section and Carousel
-const sectionTemplates = [
-  {
-    id: 'hero',
-    name: 'Hero Section',
-    icon: <Image className="h-5 w-5" />,
-    description: 'Full-width hero with background image',
-    contentTypes: ['movie', 'series'],
-    maxContent: 1
-  },
-  {
-    id: 'carousel',
-    name: 'Carousel',
-    icon: <Video className="h-5 w-5" />,
-    description: 'Horizontal scrolling carousel',
-    contentTypes: ['movie', 'series'],
-    maxContent: 20
-  }
-]
+// Import our new components
+import SectionSidebar from '../components/SectionSidebar';
+import PageCanvas from '../components/PageCanvas';
+import SectionProperties from '../components/SectionProperties';
 
 export default function PageBuilder() {
   // Core state
-  const [selectedLandingPage, setSelectedLandingPage] = useState(null)
-  const [selectedSection, setSelectedSection] = useState(null)
-  const [isPreviewMode, setIsPreviewMode] = useState(false)
-  const [viewport, setViewport] = useState('desktop')
-  const [showContentManager, setShowContentManager] = useState(false)
+  const [selectedLandingPage, setSelectedLandingPage] = useState(null);
+  const [selectedSection, setSelectedSection] = useState(null);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [viewport, setViewport] = useState('desktop');
+  const [showContentManager, setShowContentManager] = useState(false);
   
-  const queryClient = useQueryClient()
-  const canvasRef = useRef(null)
+  const queryClient = useQueryClient();
 
   // Queries
   const { data: landingPages = [], isLoading } = useQuery({
     queryKey: ['landing-pages'],
     queryFn: endpoints.landingPages,
-  })
+  });
+  console.log('LandingPages:', landingPages, 'isLoading:', isLoading);
 
   const { data: sections = [] } = useQuery({
     queryKey: ['sections'],
     queryFn: endpoints.sections,
-  })
+  });
 
   const { data: pageData = {} } = useQuery({
     queryKey: ['page-data', selectedLandingPage?.id],
     queryFn: () => endpoints.getPageData(selectedLandingPage?.id),
     enabled: !!selectedLandingPage?.id,
-  })
+  });
 
   // Mutations
-  const updateLandingPageMutation = useMutation({
-    mutationFn: ({ id, data }) => endpoints.updateLandingPage(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['landing-pages'])
-      toast.success('Page saved successfully!')
-    },
-    onError: () => toast.error('Failed to save page')
-  })
-
   const updateSectionNameMutation = useMutation({
     mutationFn: ({ id, data }) => endpoints.updateSectionName(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(['sections'])
-      toast.success('Section name updated!')
+      queryClient.invalidateQueries(['sections']);
+      toast.success('Section name updated!');
     },
     onError: () => toast.error('Failed to update section name')
-  })
+  });
 
   const createSectionMutation = useMutation({
     mutationFn: (data) => endpoints.createSection(data),
     onSuccess: (newSection) => {
-      queryClient.invalidateQueries(['sections'])
-      toast.success('Section created successfully!')
-      return newSection
+      queryClient.invalidateQueries(['sections']);
+      toast.success('Section created successfully!');
+      return newSection;
     },
     onError: () => toast.error('Failed to create section')
-  })
+  });
 
   const addSectionToLandingPageMutation = useMutation({
     mutationFn: ({ landingPageId, sectionId }) => endpoints.addSectionToLandingPage(landingPageId, sectionId),
     onSuccess: () => {
-      queryClient.invalidateQueries(['landing-pages'])
-      toast.success('Section added to page!')
+      queryClient.invalidateQueries(['landing-pages']);
+      toast.success('Section added to page!');
     },
     onError: () => toast.error('Failed to add section to page')
-  })
+  });
 
   const removeContentMutation = useMutation({
     mutationFn: ({ sectionId, itemId }) => endpoints.removeContentFromSection(sectionId, itemId),
     onSuccess: () => {
-      queryClient.invalidateQueries(['sections'])
-      queryClient.invalidateQueries(['landing-pages'])
-      queryClient.invalidateQueries(['page-data'])
-      toast.success('Content removed from section!')
+      queryClient.invalidateQueries(['sections']);
+      queryClient.invalidateQueries(['landing-pages']);
+      queryClient.invalidateQueries(['page-data']);
+      toast.success('Content removed from section!');
     },
     onError: () => toast.error('Failed to remove content')
-  })
+  });
 
   const removeSectionFromLandingPageMutation = useMutation({
     mutationFn: ({ landingPageId, sectionId }) => endpoints.removeSectionFromLandingPage(landingPageId, sectionId),
@@ -132,11 +101,11 @@ export default function PageBuilder() {
   const handleDragStart = (e, template) => {
     const { icon, ...serializableTemplate } = template;
     e.dataTransfer.setData('application/json', JSON.stringify(serializableTemplate));
-  }
+  };
 
   const handleDragOver = (e) => {
-    e.preventDefault()
-  }
+    e.preventDefault();
+  };
 
   const handleDrop = async (e) => {
     e.preventDefault();
@@ -177,8 +146,8 @@ export default function PageBuilder() {
   };
 
   const handleSectionSelect = (section) => {
-    setSelectedSection(section)
-  }
+    setSelectedSection(section);
+  };
 
   const handleSectionDelete = (sectionId) => {
     if (!selectedLandingPage) return;
@@ -212,7 +181,7 @@ export default function PageBuilder() {
   };
 
   const handleSectionUpdate = (sectionId, updates) => {
-    if (!selectedLandingPage) return
+    if (!selectedLandingPage) return;
 
     // Update landing page sections
     const updatedLandingPage = {
@@ -225,13 +194,13 @@ export default function PageBuilder() {
               ...lpSection.section,
               ...updates
             }
-          }
+          };
         }
-        return lpSection
+        return lpSection;
       })
-    }
+    };
 
-    setSelectedLandingPage(updatedLandingPage)
+    setSelectedLandingPage(updatedLandingPage);
 
     // Also update selectedSection if it matches
     if (selectedSection && selectedSection.section.id === sectionId) {
@@ -241,185 +210,46 @@ export default function PageBuilder() {
           ...selectedSection.section,
           ...updates
         }
-      })
+      });
     }
-  }
-
-  const handleSave = () => {
-    if (!selectedLandingPage) return
-    updateLandingPageMutation.mutate({
-      id: selectedLandingPage.id,
-      data: selectedLandingPage
-    })
-  }
+  };
 
   const handleOpenContentManager = (section) => {
-    setSelectedSection(section)
-    setShowContentManager(true)
-  }
+    setSelectedSection(section);
+    setShowContentManager(true);
+  };
 
   const handleContentUpdate = () => {
-    queryClient.invalidateQueries(['landing-pages'])
-    setShowContentManager(false)
-  }
+    queryClient.invalidateQueries(['landing-pages']);
+    setShowContentManager(false);
+  };
 
-  // Render section preview
-  function SectionPreview({ section, isSelected, template, onSectionSelect, onOpenContentManager, onSectionDelete, onRemoveContent }) {
-    const { data: sectionContent = [], isLoading: isContentLoading } = useQuery({
-      queryKey: ['section-content', section.section.id],
-      queryFn: () => endpoints.getSectionContent(section.section.id),
-    });
+  const handleRemoveContent = (sectionId, contentId) => {
+    removeContentMutation.mutate({ sectionId, itemId: contentId });
+  };
 
-    return (
-      <div
-        key={section.section.id}
-        className={`relative group cursor-pointer transition-all duration-200 ${
-          isSelected ? 'ring-2 ring-blue-500' : 'hover:ring-2 hover:ring-gray-300'
-        }`}
-        onClick={() => onSectionSelect(section)}
-      >
-        {/* Section Header */}
-        <div className="absolute top-0 left-0 right-0 bg-gray-800 text-white p-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <span className="text-sm font-medium">{section.section.name}</span>
-          <div className="flex items-center gap-1">
-            {template?.contentTypes?.length > 0 && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenContentManager(section)
-                }}
-                className="p-1 hover:bg-gray-700 rounded flex items-center gap-1"
-                title="Manage Content"
-              >
-                <Film className="h-3 w-3" />
-                <span className="text-xs">{sectionContent.length}</span>
-              </button>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onSectionDelete(section.section.id)
-              }}
-              className="p-1 hover:bg-red-600 rounded"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
+  // Persist selectedLandingPage to localStorage
+  useEffect(() => {
+    if (selectedLandingPage?.id) {
+      localStorage.setItem('selectedLandingPageId', selectedLandingPage.id);
+    }
+  }, [selectedLandingPage]);
 
-        {/* Section Content */}
-        <div className="py-8 max-w-7xl mx-auto">
-          {isContentLoading ? (
-            <div className="flex items-center justify-center h-32 text-gray-400">Loading...</div>
-          ) : (
-            <>
-              {section.section.section_type === 'hero' && (
-                <div className="relative h-64 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                  {sectionContent.length > 0 ? (
-                    <>
-                      <img
-                        src={sectionContent[0].content?.background_image_url || sectionContent[0].content?.poster_url || 'https://placehold.co/600x300?text=No+Image'}
-                        alt={sectionContent[0].content?.title}
-                        className="absolute inset-0 w-full h-full object-cover rounded-lg opacity-40"
-                        style={{ zIndex: 0 }}
-                        onError={e => { e.target.src = 'https://placehold.co/600x300?text=No+Image' }}
-                      />
-                      <div className="relative z-10 text-center text-white">
-                        <h2 className="text-2xl font-bold mb-2">{sectionContent[0].content?.title}</h2>
-                        <p className="text-lg opacity-90">{sectionContent[0].content?.description}</p>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-center text-white">
-                      <h2 className="text-2xl font-bold mb-2">{section.section.name}</h2>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onOpenContentManager(section)
-                        }}
-                        className="mt-4 px-6 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-gray-100 flex items-center gap-2"
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add Content
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {section.section.section_type === 'carousel' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold">{section.section.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">{sectionContent.length} items</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onOpenContentManager(section)
-                        }}
-                        className="p-1 text-gray-400 hover:text-gray-600"
-                        title="Manage Content"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 overflow-x-auto pb-4">
-                    {sectionContent.length > 0 ? (
-                      sectionContent.map((item) => (
-                        <div key={item.id} className="flex-shrink-0 w-48 h-64 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex flex-col items-center justify-center overflow-hidden">
-                          <img
-                            src={item.content?.poster_url || 'https://placehold.co/200x300?text=No+Image'}
-                            alt={item.content?.title}
-                            className="w-full h-40 object-cover rounded-t"
-                            onError={e => { e.target.src = 'https://placehold.co/200x300?text=No+Image' }}
-                          />
-                          <div className="p-2 text-center">
-                            <span className="text-gray-700 text-sm font-medium block truncate">{item.content?.title}</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                onRemoveContent(item.id)
-                              }}
-                              className="text-red-500 text-xs hover:text-red-700"
-                              title="Remove item"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="flex-shrink-0 w-full h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onOpenContentManager(section)
-                          }}
-                          className="text-gray-500 hover:text-gray-700 flex items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add Movies/Series
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-    )
-  }
+  // Restore selectedLandingPage from localStorage on mount/landingPages load
+  useEffect(() => {
+    const savedId = localStorage.getItem('selectedLandingPageId');
+    if (savedId && landingPages.length > 0) {
+      const found = landingPages.find(lp => lp.id === parseInt(savedId));
+      if (found) setSelectedLandingPage(found);
+    }
+  }, [landingPages]);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   return (
@@ -433,8 +263,8 @@ export default function PageBuilder() {
           <select
             value={selectedLandingPage?.id || ''}
             onChange={(e) => {
-              const page = landingPages.find(p => p.id === parseInt(e.target.value))
-              setSelectedLandingPage(page)
+              const page = landingPages.find(p => p.id === parseInt(e.target.value));
+              setSelectedLandingPage(page);
             }}
             className="px-3 py-1 border border-gray-300 rounded-md text-sm"
           >
@@ -482,47 +312,13 @@ export default function PageBuilder() {
             <Eye className="h-4 w-4 inline mr-1" />
             Preview
           </button>
-
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            disabled={!selectedLandingPage}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <Save className="h-4 w-4" />
-            Save
-          </button>
         </div>
       </div>
 
       <div className="flex-1 flex">
         {/* Left Sidebar - Elements Library */}
         {!isPreviewMode && (
-          <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
-            <div className="p-4">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Elements</h2>
-              
-              <div className="space-y-3">
-                {sectionTemplates.map((template) => (
-                  <div
-                    key={template.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, template)}
-                    className="border border-gray-200 rounded-lg p-3 cursor-move hover:border-blue-300 hover:shadow-sm transition-all"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      {template.icon}
-                      <h3 className="font-medium text-gray-900">{template.name}</h3>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">{template.description}</p>
-                    <div className="w-full h-20 bg-gray-100 rounded border flex items-center justify-center">
-                      <span className="text-gray-500 text-sm">{template.name}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <SectionSidebar onDragStart={handleDragStart} />
         )}
 
         {/* Main Canvas */}
@@ -543,52 +339,18 @@ export default function PageBuilder() {
           )}
 
           {/* Canvas Area */}
-          <div 
-            ref={canvasRef}
-            className={`flex-1 overflow-y-auto ${
-              isPreviewMode ? 'bg-white' : 'bg-gray-50'
-            }`}
+          <PageCanvas
+            selectedLandingPage={selectedLandingPage}
+            selectedSection={selectedSection}
+            viewport={viewport}
+            isPreviewMode={isPreviewMode}
+            onSectionSelect={handleSectionSelect}
+            onOpenContentManager={handleOpenContentManager}
+            onSectionDelete={handleSectionDelete}
+            onRemoveContent={handleRemoveContent}
             onDragOver={handleDragOver}
             onDrop={handleDrop}
-          >
-            {!selectedLandingPage ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <Layers className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No page selected</h3>
-                  <p className="text-gray-600">Select a landing page from the dropdown above to start building</p>
-                </div>
-              </div>
-            ) : (
-              <div className={`mx-auto transition-all duration-300 ${
-                viewport === 'desktop' ? 'max-w-none' :
-                viewport === 'tablet' ? 'max-w-2xl' :
-                'max-w-sm'
-              }`}>
-                {selectedLandingPage.landingpagesection_set?.map((section) => (
-                  <SectionPreview
-                    key={section.section.id}
-                    section={section}
-                    isSelected={selectedSection?.section.id === section.section.id}
-                    template={sectionTemplates.find(t => t.id === section.section.section_type)}
-                    onSectionSelect={handleSectionSelect}
-                    onOpenContentManager={handleOpenContentManager}
-                    onSectionDelete={handleSectionDelete}
-                    onRemoveContent={(contentId) => {
-                      removeContentMutation.mutate({ sectionId: section.section.id, itemId: contentId });
-                    }}
-                  />
-                )) || (
-                  <div className="flex items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg m-4">
-                    <div className="text-center">
-                      <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600">Drag elements here to build your page</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          />
         </div>
 
         {/* Right Sidebar - Properties Panel */}
@@ -638,51 +400,5 @@ export default function PageBuilder() {
         </div>
       )}
     </div>
-  )
-}
-
-// Section Properties Component
-function SectionProperties({ section, onUpdate, updateSectionNameMutation }) {
-  const [name, setName] = useState(section.section.name || "")
-  const [dirty, setDirty] = useState(false)
-  
-  // Reset state when selected section changes
-  useEffect(() => {
-    setName(section.section.name || "")
-    setDirty(false)
-  }, [section.section.id, section.section.name])
-
-  const handleNameChange = (e) => {
-    const newName = e.target.value;
-    setName(newName)
-    onUpdate({ name: newName })
-    setDirty(true);
-  }
-
-  const handleSave = () => {
-    updateSectionNameMutation.mutate({ id: section.section.id, data: { name } })
-    setDirty(false)
-  }
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Section Name
-        </label>
-        <input
-          type="text"
-          value={name}
-          onChange={handleNameChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      <button
-        onClick={handleSave}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-      >
-        Save
-      </button>
-    </div>
-  )
+  );
 } 
