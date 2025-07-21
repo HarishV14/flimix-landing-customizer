@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
 
 /**
  * Section Properties Component
  * Only section name change is allowed now
  */
-export default function SectionProperties({ section, onUpdate, updateSectionNameMutation }) {
+export default function SectionProperties({ section, onUpdate }) {
   const [name, setName] = useState(section.section.name || "");
   const [dirty, setDirty] = useState(false);
   
@@ -25,6 +26,14 @@ export default function SectionProperties({ section, onUpdate, updateSectionName
     updateSectionNameMutation.mutate({ id: section.section.id, data: { name } });
     setDirty(false);
   };
+  const updateSectionNameMutation = useMutation({
+    mutationFn: ({ id, data }) => endpoints.updateSectionName(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['sections']);
+      toast.success('Section name updated!');
+    },
+    onError: () => toast.error('Failed to update section name')
+  });
 
   return (
     <div className="space-y-6">

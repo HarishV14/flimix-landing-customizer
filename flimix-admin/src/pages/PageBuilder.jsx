@@ -18,6 +18,9 @@ import SectionSidebar from '../components/SectionSidebar';
 import SectionProperties from '../components/SectionProperties';
 import SectionWidget from '../components/SectionWidget'; // Added import for SectionWidget
 import { getSectionType } from '../lib/sectionRegistry'; // Add this import
+import LandingPageSelector from '../components/LandingPageSelector';
+import CanvasToolbar from '../components/CanvasToolbar';
+import PageCanvas from '../components/PageCanvas';
 
 export default function PageBuilder() {
   // Core state
@@ -26,40 +29,15 @@ export default function PageBuilder() {
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [viewport, setViewport] = useState('desktop');
   const [showContentManager, setShowContentManager] = useState(false);
-  const [draggedSectionIndex, setDraggedSectionIndex] = useState(null);
-  const [isSectionDragging, setIsSectionDragging] = useState(false);
-  const [isContentDragging, setIsContentDragging] = useState(false);
   const [isSidebarDragging, setIsSidebarDragging] = useState(false);
   
   const queryClient = useQueryClient();
 
-  // Queries
   const { data: landingPages = [], isLoading } = useQuery({
     queryKey: ['landing-pages'],
     queryFn: endpoints.landingPages,
   });
-  console.log('LandingPages:', landingPages, 'isLoading:', isLoading);
 
-  const { data: sections = [] } = useQuery({
-    queryKey: ['sections'],
-    queryFn: endpoints.sections,
-  });
-
-  const { data: pageData = {} } = useQuery({
-    queryKey: ['page-data', selectedLandingPage?.id],
-    queryFn: () => endpoints.getPageData(selectedLandingPage?.id),
-    enabled: !!selectedLandingPage?.id,
-  });
-
-  // Mutations
-  const updateSectionNameMutation = useMutation({
-    mutationFn: ({ id, data }) => endpoints.updateSectionName(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['sections']);
-      toast.success('Section name updated!');
-    },
-    onError: () => toast.error('Failed to update section name')
-  });
 
   const createSectionMutation = useMutation({
     mutationFn: (data) => endpoints.createSection(data),
@@ -85,7 +63,6 @@ export default function PageBuilder() {
     onSuccess: () => {
       queryClient.invalidateQueries(['sections']);
       queryClient.invalidateQueries(['landing-pages']);
-      queryClient.invalidateQueries(['page-data']);
       toast.success('Content removed from section!');
     },
     onError: () => toast.error('Failed to remove content')
@@ -95,9 +72,6 @@ export default function PageBuilder() {
     mutationFn: ({ landingPageId, sectionId }) => endpoints.removeSectionFromLandingPage(landingPageId, sectionId),
     onSuccess: () => {
       queryClient.invalidateQueries(['landing-pages']);
-      queryClient.invalidateQueries(['page-data']);
-      queryClient.refetchQueries(['landing-pages']);
-      queryClient.refetchQueries(['page-data']);
       toast.success('Section removed from page!');
     },
     onError: () => toast.error('Failed to remove section from page')
@@ -109,11 +83,6 @@ export default function PageBuilder() {
     e.dataTransfer.setData('application/json', JSON.stringify(serializableTemplate));
   };
 
-  // Removed handleDrop and handleDragOver as they are not used
-
-  const handleSectionSelect = (section) => {
-    setSelectedSection(section);
-  };
 
   const handleSectionDelete = (sectionId) => {
     if (!selectedLandingPage) return;
@@ -196,48 +165,6 @@ export default function PageBuilder() {
 
   // Drag-and-drop handlers for section reordering
 
-  /**
-   * Called when a section drag starts. Stores the index of the dragged section.
-   */
-  const handleSectionDragStart = (e, idx) => {
-    setDraggedSectionIndex(idx);
-    setIsSectionDragging(true);
-  };
-
-  /**
-   * Called when a dragged section is over a drop target. Required to allow dropping.
-   */
-  const handleSectionDragOver = (e, idx) => {
-    e.preventDefault(); // Must call this to allow dropping
-  };
-
-  /**
-   * Called when a dragged section is dropped on a new position.
-   * Reorders the sections in the frontend and backend.
-   */
-  const handleSectionDrop = async (e, idx) => {
-    e.preventDefault();
-    if (draggedSectionIndex === null || draggedSectionIndex === idx) return;
-    if (!selectedLandingPage) return;
-
-    // 1. Reorder the array in the frontend (for immediate feedback)
-    const newOrder = [...selectedLandingPage.landingpagesection_set];
-    const [moved] = newOrder.splice(draggedSectionIndex, 1);
-    newOrder.splice(idx, 0, moved);
-
-    // 2. Update the backend
-    const orderString = newOrder.map(s => s.id).join(',');
-    await endpoints.reorderLandingPageSections(selectedLandingPage.id, { section_order: orderString });
-
-    // 3. Update local state for instant UI feedback
-    setSelectedLandingPage({
-      ...selectedLandingPage,
-      landingpagesection_set: newOrder
-    });
-    setDraggedSectionIndex(null);
-    setIsSectionDragging(false);
-  };
-
   // Sidebar drag handlers
   const handleSidebarDragOver = (e) => {
     e.preventDefault();
@@ -308,59 +235,22 @@ export default function PageBuilder() {
           <h1 className="text-lg font-semibold text-gray-900">Page Builder</h1>
           
           {/* Landing Page Selector */}
-          <select
-            value={selectedLandingPage?.id || ''}
-            onChange={(e) => {
-              const page = landingPages.find(p => p.id === parseInt(e.target.value));
-              setSelectedLandingPage(page);
-            }}
-            className="px-3 py-1 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="">Select a landing page</option>
-            {landingPages.map((page) => (
-              <option key={page.id} value={page.id}>
-                {page.name} {page.is_active && '(Active)'}
-              </option>
-            ))}
-          </select>
+          <LandingPageSelector
+            landingPages={landingPages}
+            selectedLandingPage={selectedLandingPage}
+            setSelectedLandingPage={setSelectedLandingPage}
+          />
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Viewport Controls */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewport('desktop')}
-              className={`p-2 rounded ${viewport === 'desktop' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            >
-              <Desktop className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewport('tablet')}
-              className={`p-2 rounded ${viewport === 'tablet' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            >
-              <Tablet className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewport('mobile')}
-              className={`p-2 rounded ${viewport === 'mobile' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}
-            >
-              <Smartphone className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Preview Toggle */}
-          <button
-            onClick={() => setIsPreviewMode(!isPreviewMode)}
-            className={`px-3 py-1 rounded-md text-sm font-medium ${
-              isPreviewMode 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Eye className="h-4 w-4 inline mr-1" />
-            Preview
-          </button>
-        </div>
+        {/* Canvas Toolbar */}
+        {!isPreviewMode && (
+          <CanvasToolbar
+            viewport={viewport}
+            setViewport={setViewport}
+            isPreviewMode={isPreviewMode}
+            setIsPreviewMode={setIsPreviewMode}
+          />
+        )}
       </div>
 
       <div className="flex-1 flex">
@@ -370,64 +260,20 @@ export default function PageBuilder() {
         )}
 
         {/* Main Canvas */}
-        <div className="flex-1 flex flex-col">
-          {/* Canvas Toolbar */}
-          {!isPreviewMode && (
-            <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-600">
-                  {selectedLandingPage ? `${selectedLandingPage.name} - ${selectedLandingPage.landingpagesection_set?.length || 0} sections` : 'No page selected'}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span>Drag elements from the sidebar to add them to your page</span>
-              </div>
-            </div>
-          )}
-
-          {/* Canvas Area with drag-and-drop for sections */}
-          <div
-            onDragOver={isSidebarDragging ? handleSidebarDragOver : undefined}
-            onDrop={isSidebarDragging ? handleSidebarDrop : undefined}
-          >
-            <div className={`mx-auto transition-all duration-300 ${
-              viewport === 'desktop' ? 'max-w-none' :
-              viewport === 'tablet' ? 'max-w-2xl' :
-              'max-w-sm'
-            }`}>
-              {selectedLandingPage?.landingpagesection_set?.map((section, idx) => (
-                <div
-                  key={section.section.id}
-                  draggable={!isContentDragging && !isSidebarDragging}
-                  onDragStart={!isContentDragging && !isSidebarDragging ? (e) => handleSectionDragStart(e, idx) : undefined}
-                  onDragOver={!isContentDragging && !isSidebarDragging ? (e) => handleSectionDragOver(e, idx) : undefined}
-                  onDrop={!isContentDragging && !isSidebarDragging ? (e) => handleSectionDrop(e, idx) : undefined}
-                >
-                  <SectionWidget
-                    section={section}
-                    isSelected={selectedSection?.section.id === section.section.id}
-                    template={getSectionType(section.section.section_type)}
-                    onSectionSelect={handleSectionSelect}
-                    onOpenContentManager={handleOpenContentManager}
-                    onSectionDelete={handleSectionDelete}
-                    onRemoveContent={(contentId) => handleRemoveContent(section.section.id, contentId)}
-                    isSectionDragging={isSectionDragging}
-                    isContentDragging={isContentDragging}
-                    setIsContentDragging={setIsContentDragging}
-                  />
-                </div>
-              )) || (
-                <div className="flex items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg m-4">
-                  <div className="text-center">
-                    <Plus className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Drag elements here to build your page</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <PageCanvas
+          selectedLandingPage={selectedLandingPage}
+          setSelectedLandingPage={setSelectedLandingPage}
+          selectedSection={selectedSection}
+          setSelectedSection={setSelectedSection}
+          isSidebarDragging={isSidebarDragging}
+          handleSidebarDragOver={handleSidebarDragOver}
+          handleSidebarDrop={handleSidebarDrop}
+          getSectionType={getSectionType}
+          handleOpenContentManager={handleOpenContentManager}
+          handleSectionDelete={handleSectionDelete}
+          handleRemoveContent={handleRemoveContent}
+          viewport={viewport}
+        />
 
         {/* Right Sidebar - Properties Panel */}
         {!isPreviewMode && selectedSection && (
@@ -438,7 +284,6 @@ export default function PageBuilder() {
               <SectionProperties
                 section={selectedSection}
                 onUpdate={(updates) => handleSectionUpdate(selectedSection.section.id, updates)}
-                updateSectionNameMutation={updateSectionNameMutation}
               />
             </div>
           </div>

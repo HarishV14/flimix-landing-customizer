@@ -7,24 +7,22 @@ import { useQueryClient } from '@tanstack/react-query';
  * Carousel Section Widget Component
  * Renders a horizontal scrolling carousel of movies or series
  */
-export default function CarouselSectionWidget({ 
-  section, 
-  sectionContent = [], 
-  isSelected, 
+export default function CarouselSectionWidget({
+  section,
+  sectionContent = [],
+  isSelected,
   onOpenContentManager,
   onRemoveContent,
-  isContentLoading,
-  isSectionDragging,
-  isContentDragging,
-  setIsContentDragging
+  isContentLoading
 }) {
   const [draggedIndex, setDraggedIndex] = useState(null);
+  const [isContentDragging, setIsContentDragging] = useState(false);
   const queryClient = useQueryClient();
 
   // Drag-and-drop handlers for carousel content
   const handleContentDragStart = (idx) => {
     setDraggedIndex(idx);
-    setIsContentDragging && setIsContentDragging(true);
+    setIsContentDragging(true);
   };
 
   const handleContentDragOver = (e) => {
@@ -40,7 +38,7 @@ export default function CarouselSectionWidget({
     await endpoints.reorderSectionContent(section.section.id, { content_order: orderString });
     queryClient.invalidateQueries(['section-content', section.section.id]);
     setDraggedIndex(null);
-    setIsContentDragging && setIsContentDragging(false);
+    setIsContentDragging(false);
   };
 
   return (
@@ -66,12 +64,12 @@ export default function CarouselSectionWidget({
           <div className="flex items-center justify-center h-32 w-full text-gray-400">Loading...</div>
         ) : sectionContent.length > 0 ? (
           sectionContent.map((item, idx) => (
-            <div 
-              key={item.id} 
-              draggable={!isSectionDragging}
-              onDragStart={!isSectionDragging ? () => handleContentDragStart(idx) : undefined}
-              onDragOver={!isSectionDragging ? handleContentDragOver : undefined}
-              onDrop={!isSectionDragging ? () => handleContentDrop(idx) : undefined}
+            <div
+              key={item.id}
+              draggable
+              onDragStart={() => handleContentDragStart(idx)}
+              onDragOver={handleContentDragOver}
+              onDrop={() => handleContentDrop(idx)}
               className="flex-shrink-0 w-48 h-64 bg-gradient-to-br from-gray-200 to-gray-300 rounded-lg flex flex-col items-center justify-center overflow-hidden"
             >
               <img
